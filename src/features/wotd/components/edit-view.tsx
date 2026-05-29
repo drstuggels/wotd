@@ -2,10 +2,11 @@
 
 import type { FormEvent } from "react";
 import { ExampleBrowser } from "./example-browser";
-import { editPages } from "../constants";
+import { editPages, prebuiltWordSets } from "../constants";
 import type {
   AppSettings,
   EditPage,
+  PrebuiltWordSet,
   SavedWord,
   SynonymOption,
 } from "../types";
@@ -21,6 +22,7 @@ import {
 } from "../words";
 
 type EditViewProps = {
+  addPrebuiltWordSet: (wordSet: PrebuiltWordSet) => void;
   appSettings: AppSettings;
   bulkWords: string;
   deleteWord: (id: string) => void;
@@ -47,6 +49,7 @@ type EditViewProps = {
 };
 
 export function EditView({
+  addPrebuiltWordSet,
   appSettings,
   bulkWords,
   deleteWord,
@@ -302,6 +305,29 @@ export function EditView({
               placeholder={"solace, liminal; brio\nverdant\ntenet"}
               value={bulkWords}
             />
+            <details className="border-4 border-black">
+              <summary className="cursor-pointer p-3 font-mono text-xs uppercase hover:bg-lime-200 focus:bg-lime-200">
+                ready made sets
+              </summary>
+              <div className="grid gap-2 border-t-4 border-black p-3">
+                {prebuiltWordSets.map((wordSet) => (
+                  <button
+                    className="min-w-0 border-4 border-black bg-white p-3 text-left hover:bg-lime-200 focus:bg-lime-200"
+                    disabled={isAdding || isBulkAdding}
+                    key={wordSet.id}
+                    onClick={() => addPrebuiltWordSet(wordSet)}
+                    type="button"
+                  >
+                    <span className="block font-black uppercase">
+                      add {wordSet.label}
+                    </span>
+                    <span className="mt-1 block font-mono text-xs">
+                      {wordSet.words.length} words / {wordSet.description}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </details>
             <button
               className="w-full min-w-0 border-4 border-black bg-lime-300 px-4 py-4 font-black uppercase disabled:bg-neutral-200"
               disabled={isAdding || isBulkAdding}

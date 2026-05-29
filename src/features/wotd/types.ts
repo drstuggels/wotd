@@ -4,6 +4,12 @@ export type HiddenField = "word" | "definition";
 export type PracticeMark = "known" | "review";
 export type PracticeDirection = "word-first" | "definition-first" | "random";
 export type SettingsPage = "data" | "synonyms" | "backup";
+export type PrebuiltWordSet = {
+  description: string;
+  id: string;
+  label: string;
+  words: string[];
+};
 export type SynonymCategory =
   | "archaic"
   | "literary"

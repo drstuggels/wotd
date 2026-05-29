@@ -6,6 +6,8 @@ import type { SavedWord, SettingsPage, SynonymCategory } from "../types";
 type SettingsViewProps = {
   clearWords: () => void;
   exportedJson: string;
+  forceRefresh: () => void;
+  forceRefreshAndClearWords: () => void;
   importValue: string;
   importWords: () => void;
   isRefetching: boolean;
@@ -23,6 +25,8 @@ type SettingsViewProps = {
 export function SettingsView({
   clearWords,
   exportedJson,
+  forceRefresh,
+  forceRefreshAndClearWords,
   importValue,
   importWords,
   isRefetching,
@@ -79,7 +83,22 @@ export function SettingsView({
             onClick={clearWords}
             type="button"
           >
-            Clear all data
+            Clear saved words
+          </button>
+          <button
+            className="mt-4 w-full border-4 border-black bg-white px-4 py-4 font-black uppercase hover:bg-lime-200"
+            onClick={forceRefresh}
+            type="button"
+          >
+            Force refresh
+          </button>
+          <button
+            className="mt-4 w-full border-4 border-black bg-red-500 px-4 py-4 font-black uppercase text-white hover:bg-red-600 disabled:bg-neutral-500"
+            disabled={!words.length || isRefetching}
+            onClick={forceRefreshAndClearWords}
+            type="button"
+          >
+            Force refresh + clear words
           </button>
           {status && <p className="mt-3 font-mono text-sm">{status}</p>}
         </section>

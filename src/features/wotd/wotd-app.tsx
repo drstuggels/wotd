@@ -20,6 +20,7 @@ import type {
   HiddenField,
   PracticeDirection,
   PracticeMark,
+  PrebuiltWordSet,
   SavedWord,
   SettingsPage,
   SynonymCategory,
@@ -40,6 +41,18 @@ import {
   parseWordList,
 } from "./words";
 
+function hashPracticePrompt(id: string, seed: number) {
+  let hash = 2166136261;
+  const input = `${seed}:${id}`;
+
+  for (let index = 0; index < input.length; index += 1) {
+    hash ^= input.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+
+  return hash >>> 0;
+}
+
 export function WotdApp() {
   const [view, setView] = useState<View>("practice");
   const [editPage, setEditPage] = useState<EditPage>("words");
@@ -55,6 +68,9 @@ export function WotdApp() {
   const [isBulkAdding, setIsBulkAdding] = useState(false);
   const [isRefetching, setIsRefetching] = useState(false);
   const [practiceIndex, setPracticeIndex] = useState(0);
+  const [practiceShuffleSeed, setPracticeShuffleSeed] = useState(() =>
+    Math.random(),
+  );
   const [practiceDirection, setPracticeDirection] =
     useState<PracticeDirection>("word-first");
   const [synonymCategorySettings, setSynonymCategorySettings] = useState(
@@ -194,7 +210,8 @@ export function WotdApp() {
       void fetchSuggestions(query).then((nextSuggestions) => {
         setSuggestions(
           nextSuggestions.filter(
-            (suggestion) => !words.some((word) => word.word === suggestion),
+            (suggestion) =>
+              !words.some((word) => normalizeWord(word.word) === suggestion),
           ),
         );
       });
@@ -217,7 +234,7 @@ export function WotdApp() {
           : [word.partOfSpeech ?? ""];
 
         return (
-          word.word.includes(query) ||
+          normalizeWord(word.word).includes(query) ||
           definitions.some((definition) =>
             definition.definition.toLowerCase().includes(query),
           ) ||
@@ -237,11 +254,17 @@ export function WotdApp() {
   const practiceWords = useMemo(
     () =>
       [...words].sort((a, b) => {
-        const aTime = a.lastPracticedAt ?? a.createdAt;
-        const bTime = b.lastPracticedAt ?? b.createdAt;
-        return aTime.localeCompare(bTime);
+        const score =
+          hashPracticePrompt(a.id, practiceShuffleSeed) -
+          hashPracticePrompt(b.id, practiceShuffleSeed);
+
+        if (score !== 0) {
+          return score;
+        }
+
+        return a.word.localeCompare(b.word);
       }),
-    [words],
+    [practiceShuffleSeed, words],
   );
 
   const safePracticeIndex = practiceWords.length
@@ -263,7 +286,9 @@ export function WotdApp() {
     appSettings,
   );
   const selectedSynonymAlreadySaved = selectedSynonym
-    ? words.some((word) => word.word === selectedSynonym.word)
+    ? words.some(
+        (word) => normalizeWord(word.word) === selectedSynonym.word,
+      )
     : false;
   const synonymDefinitionOptions = synonymLookup?.definitions ?? [];
   const safeSynonymDefinitionIndex = synonymDefinitionOptions.length
@@ -301,7 +326,7 @@ export function WotdApp() {
       return;
     }
 
-    if (words.some((savedWord) => savedWord.word === word)) {
+    if (words.some((savedWord) => normalizeWord(savedWord.word) === word)) {
       setStatus("That word is already saved.");
       return;
     }
@@ -311,7 +336,13 @@ export function WotdApp() {
       const result = await fetchDefinition(word);
       const savedWord = createSavedWord(word, result);
 
-      setWords((current) => [savedWord, ...current]);
+      setWords((current) =>
+        current.some(
+          (existingWord) => normalizeWord(existingWord.word) === word,
+        )
+          ? current
+          : [savedWord, ...current],
+      );
       setNewWord("");
       setSuggestions([]);
       setStatus(`Saved "${word}".`);
@@ -332,7 +363,9 @@ export function WotdApp() {
       return;
     }
 
-    const existingWords = new Set(words.map((word) => word.word));
+    const existingWords = new Set(
+      words.map((word) => normalizeWord(word.word)),
+    );
     const lookupWords = parsedWords.filter((word) => !existingWords.has(word));
     const skippedCount = parsedWords.length - lookupWords.length;
 
@@ -356,7 +389,16 @@ export function WotdApp() {
       }
 
       if (savedWords.length) {
-        setWords((current) => [...savedWords, ...current]);
+        setWords((current) => {
+          const currentWords = new Set(
+            current.map((word) => normalizeWord(word.word)),
+          );
+          const uniqueSavedWords = savedWords.filter(
+            (word) => !currentWords.has(word.word),
+          );
+
+          return [...uniqueSavedWords, ...current];
+        });
         setBulkWords("");
       }
 
@@ -370,6 +412,33 @@ export function WotdApp() {
     } finally {
       setIsBulkAdding(false);
     }
+  }
+
+  function addPrebuiltWordSet(wordSet: PrebuiltWordSet) {
+    const queuedWords = parseWordList(bulkWords);
+    const existingWords = new Set([
+      ...words.map((word) => normalizeWord(word.word)),
+      ...queuedWords,
+    ]);
+    const missingWords = wordSet.words.filter(
+      (word) => !existingWords.has(normalizeWord(word)),
+    );
+    const skippedCount = wordSet.words.length - missingWords.length;
+
+    if (!missingWords.length) {
+      setStatus(`${wordSet.label} is already saved or queued.`);
+      return;
+    }
+
+    setBulkWords([...queuedWords, ...missingWords].join("\n"));
+    setStatus(
+      [
+        `Queued ${missingWords.length} from ${wordSet.label}`,
+        skippedCount ? `skipped ${skippedCount} duplicate` : "",
+      ]
+        .filter(Boolean)
+        .join(" / ") + ".",
+    );
   }
 
   function deleteWord(id: string) {
@@ -480,14 +549,23 @@ export function WotdApp() {
     });
     setHiddenField(getHiddenField(practiceDirection));
     setPracticeIndex(
-      safePracticeIndex >= practiceWords.length - 1 ? 0 : safePracticeIndex,
+      safePracticeIndex >= practiceWords.length - 1
+        ? 0
+        : safePracticeIndex + 1,
     );
   }
 
   function setDirection(direction: PracticeDirection) {
+    if (direction === practiceDirection) {
+      return;
+    }
+
     setPracticeDirection(direction);
     setHiddenField(getHiddenField(direction));
     setIsRevealed(false);
+    setPracticeIndex(0);
+    setPreviewDefinitionIndices({});
+    setPracticeShuffleSeed(Math.random());
   }
 
   function toggleSynonymCategory(category: SynonymCategory) {
@@ -533,7 +611,11 @@ export function WotdApp() {
       example: synonymDefinition.example,
     };
     setWords((current) => {
-      if (current.some((word) => word.word === selectedSynonym.word)) {
+      if (
+        current.some(
+          (word) => normalizeWord(word.word) === selectedSynonym.word,
+        )
+      ) {
         return current;
       }
 
@@ -623,8 +705,23 @@ export function WotdApp() {
       setWords([]);
       setPracticeIndex(0);
       setIsRevealed(false);
+      setPreviewDefinitionIndices({});
+      setPracticeShuffleSeed(Math.random());
       setStatus("All words cleared.");
     }
+  }
+
+  function forceRefresh() {
+    window.location.reload();
+  }
+
+  function forceRefreshAndClearWords() {
+    if (!window.confirm("Clear saved words and reload the app?")) {
+      return;
+    }
+
+    localStorage.removeItem(STORAGE_KEY);
+    window.location.reload();
   }
 
   function importWords() {
@@ -689,7 +786,7 @@ export function WotdApp() {
 
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-6xl flex-col sm:px-6 sm:py-4 lg:px-8">
-      <header className="bg-white sm:border-4 sm:border-black">
+      <header className="bg-background sm:border-4 sm:border-black sm:bg-white">
         <div className="flex flex-col justify-between gap-4 border-b-4 border-black p-3 sm:flex-row sm:items-end sm:p-4">
           <div className="min-w-0">
             <p className="font-mono text-xs uppercase">local vocabulary deck</p>
@@ -713,7 +810,7 @@ export function WotdApp() {
         </nav>
       </header>
 
-      <section className="flex-1 bg-white p-3 sm:border-x-4 sm:border-b-4 sm:border-black sm:p-6">
+      <section className="flex-1 bg-background p-3 sm:border-x-4 sm:border-b-4 sm:border-black sm:bg-white sm:p-6">
         {view === "practice" && (
           <PracticeView
             currentDefinition={currentDefinition}
@@ -735,6 +832,7 @@ export function WotdApp() {
 
         {view === "edit" && (
           <EditView
+            addPrebuiltWordSet={addPrebuiltWordSet}
             appSettings={appSettings}
             bulkWords={bulkWords}
             deleteWord={deleteWord}
@@ -765,6 +863,8 @@ export function WotdApp() {
           <SettingsView
             clearWords={clearWords}
             exportedJson={exportedJson}
+            forceRefresh={forceRefresh}
+            forceRefreshAndClearWords={forceRefreshAndClearWords}
             importValue={importValue}
             importWords={importWords}
             isRefetching={isRefetching}

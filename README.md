@@ -49,4 +49,6 @@ CNAME wotd -> the Pages hostname shown by cf-deploy
 - [ ] linked words
 - [ ] word forms
 - [ ] antonyms / hypernyms / hyponyms
+- [ ] collapsable sections?
+- [ ] animations?
 - [ ] translations?
