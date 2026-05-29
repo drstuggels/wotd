@@ -277,7 +277,7 @@ export function WotdApp() {
   );
   const exportedJson = useMemo(() => JSON.stringify(words, null, 2), [words]);
 
-  function getPreviewDefinitionIndex(word?: SavedWord) {
+  function getPreviewDefinitionIndex(word?: SavedWord | null) {
     const definitions = getDefinitionOptions(word);
     if (!word || !definitions.length) {
       return 0;

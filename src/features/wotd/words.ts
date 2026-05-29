@@ -372,7 +372,7 @@ export function directionLabel(direction: PracticeDirection) {
   return "word first";
 }
 
-export function getDefinitionOptions(word?: SavedWord) {
+export function getDefinitionOptions(word?: SavedWord | null) {
   if (!word) {
     return [];
   }
@@ -393,7 +393,7 @@ export function getDefinitionOptions(word?: SavedWord) {
   return [legacyDefinition];
 }
 
-export function getDefinitionIndex(word?: SavedWord) {
+export function getDefinitionIndex(word?: SavedWord | null) {
   const definitions = getDefinitionOptions(word);
 
   if (!word || !definitions.length) {
@@ -406,12 +406,12 @@ export function getDefinitionIndex(word?: SavedWord) {
   );
 }
 
-export function getActiveDefinition(word?: SavedWord) {
+export function getActiveDefinition(word?: SavedWord | null) {
   const definitions = getDefinitionOptions(word);
   return definitions[getDefinitionIndex(word)];
 }
 
-export function formatPartsOfSpeech(word?: SavedWord) {
+export function formatPartsOfSpeech(word?: SavedWord | null) {
   if (!word) {
     return "";
   }

@@ -19,6 +19,30 @@ pnpm lint
 pnpm build
 ```
 
+## Cloudflare Pages
+
+```bash
+cp cloudflare.env.example cloudflare.env
+make cf-login
+make cf-project
+make cf-deploy
+make cf-domain
+```
+
+```bash
+make cf-deploy
+```
+
+```bash
+make cf-domain DOMAIN=wotd.example.com
+```
+
+Create the DNS record yourself:
+
+```text
+CNAME wotd -> the Pages hostname shown by cf-deploy
+```
+
 ## Todo
 
 - [ ] nicer colors
