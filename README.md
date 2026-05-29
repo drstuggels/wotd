@@ -18,3 +18,11 @@ Open `http://localhost:3000`.
 pnpm lint
 pnpm build
 ```
+
+## Todo
+
+- [ ] nicer colors
+- [ ] linked words
+- [ ] word forms
+- [ ] antonyms / hypernyms / hyponyms
+- [ ] translations?

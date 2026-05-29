@@ -1,0 +1,302 @@
+"use client";
+
+import { ExampleBrowser } from "./example-browser";
+import { practiceDirections } from "../constants";
+import type {
+  DefinitionOption,
+  HiddenField,
+  PracticeDirection,
+  PracticeMark,
+  SavedWord,
+  SynonymOption,
+} from "../types";
+import {
+  directionLabel,
+  formatDate,
+  formatDefinitionSource,
+  formatPartsOfSpeech,
+  getDefinitionExamples,
+  getDefinitionIndex,
+} from "../words";
+
+type PracticeViewProps = {
+  currentDefinition: DefinitionOption | undefined;
+  currentDefinitionIndex: number;
+  currentDefinitionOptions: DefinitionOption[];
+  currentSynonyms: SynonymOption[];
+  currentWord: SavedWord | null;
+  hiddenField: HiddenField;
+  isRevealed: boolean;
+  markPractice: (mark: PracticeMark) => void;
+  openSynonym: (synonym: SynonymOption) => void;
+  practiceDirection: PracticeDirection;
+  previewDefinition: (id: string, direction: -1 | 1) => void;
+  selectPreviewDefinition: (id: string) => void;
+  setDirection: (direction: PracticeDirection) => void;
+  setIsRevealed: (isRevealed: boolean) => void;
+};
+
+export function PracticeView({
+  currentDefinition,
+  currentDefinitionIndex,
+  currentDefinitionOptions,
+  currentSynonyms,
+  currentWord,
+  hiddenField,
+  isRevealed,
+  markPractice,
+  openSynonym,
+  practiceDirection,
+  previewDefinition,
+  selectPreviewDefinition,
+  setDirection,
+  setIsRevealed,
+}: PracticeViewProps) {
+  const currentPartsOfSpeech = formatPartsOfSpeech(currentWord);
+
+  return (
+    <div className="flex min-h-[560px] flex-col gap-4">
+      <div className="border-4 border-black p-3">
+        <p className="font-mono text-xs uppercase">direction</p>
+        <div className="mt-3 grid gap-2 sm:grid-cols-3">
+          {practiceDirections.map((direction) => (
+            <button
+              className={`border-4 border-black px-3 py-3 text-left text-sm font-black uppercase hover:bg-lime-200 min-[380px]:text-base sm:text-center ${
+                practiceDirection === direction ? "bg-lime-300" : "bg-white"
+              }`}
+              key={direction}
+              onClick={() => setDirection(direction)}
+              type="button"
+            >
+              {directionLabel(direction)}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-[1fr_18rem]">
+        <div className="group grid min-h-[42rem] w-full grid-rows-[1fr_auto] overflow-hidden border-4 border-black bg-neutral-50 text-left hover:bg-lime-100">
+          <div
+            className={`grid min-h-0 w-full grid-rows-[auto_1fr_auto] overflow-hidden bg-transparent p-3 text-left min-[380px]:p-4 sm:p-6 ${
+              currentWord && !isRevealed ? "cursor-pointer" : ""
+            }`}
+            onClick={() => currentWord && !isRevealed && setIsRevealed(true)}
+            onKeyDown={(event) => {
+              if (
+                currentWord &&
+                !isRevealed &&
+                (event.key === "Enter" || event.key === " ")
+              ) {
+                event.preventDefault();
+                setIsRevealed(true);
+              }
+            }}
+            role={currentWord && !isRevealed ? "button" : undefined}
+            tabIndex={currentWord && !isRevealed ? 0 : undefined}
+          >
+            {currentWord ? (
+              <>
+                <div className="flex flex-wrap items-center gap-2 font-mono text-xs uppercase">
+                  {currentPartsOfSpeech && (
+                    <span className="border-2 border-black px-2 py-1">
+                      {currentPartsOfSpeech}
+                    </span>
+                  )}
+                  <span className="border-2 border-black px-2 py-1">
+                    added {formatDate(currentWord.createdAt)}
+                  </span>
+                </div>
+
+                <div className="grid min-h-0 content-start gap-3 overflow-y-auto py-4 sm:gap-4 sm:py-5">
+                  <div className="h-36 overflow-hidden border-4 border-black bg-white p-4">
+                    <p className="font-mono text-xs uppercase">word</p>
+                    <div className="mt-3 h-20 overflow-y-auto break-words text-4xl font-black leading-tight sm:text-6xl">
+                      {hiddenField === "word" && !isRevealed ? (
+                        <span
+                          aria-label="hidden word"
+                          className="block h-full w-full border-4 border-black bg-[repeating-linear-gradient(135deg,#050505_0,#050505_10px,#f4f4f0_10px,#f4f4f0_20px)]"
+                        />
+                      ) : (
+                        currentWord.word
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="border-4 border-black bg-white p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="font-mono text-xs uppercase">
+                        definition
+                      </p>
+                      {isRevealed && currentDefinition && (
+                        <span className="font-mono text-[10px] uppercase text-neutral-600">
+                          {formatDefinitionSource(currentDefinition)}
+                        </span>
+                      )}
+                    </div>
+                    <div className="mt-2 text-xl font-semibold leading-snug [overflow-wrap:anywhere] sm:text-2xl">
+                      {hiddenField === "definition" && !isRevealed ? (
+                        <span
+                          aria-label="hidden definition"
+                          className="block h-40 w-full border-4 border-black bg-[repeating-linear-gradient(135deg,#050505_0,#050505_10px,#f4f4f0_10px,#f4f4f0_20px)]"
+                        />
+                      ) : (
+                        currentDefinition?.definition
+                      )}
+                    </div>
+                  </div>
+
+                  {isRevealed &&
+                    getDefinitionExamples(currentDefinition).length > 0 && (
+                      <ExampleBrowser
+                        examples={getDefinitionExamples(currentDefinition)}
+                      />
+                    )}
+
+                  {isRevealed &&
+                    currentSynonyms.length > 0 && (
+                      <div className="border-4 border-black bg-white p-4">
+                        <p className="font-mono text-xs uppercase">
+                          synonyms
+                        </p>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {currentSynonyms.map((synonym) => (
+                            <span
+                              className="border-2 border-black px-2 py-1 font-mono text-xs uppercase hover:bg-lime-200 focus:bg-lime-200"
+                              key={synonym.word}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                openSynonym(synonym);
+                              }}
+                              onKeyDown={(event) => {
+                                if (
+                                  event.key === "Enter" ||
+                                  event.key === " "
+                                ) {
+                                  event.preventDefault();
+                                  event.stopPropagation();
+                                  openSynonym(synonym);
+                                }
+                              }}
+                              role="button"
+                              tabIndex={0}
+                            >
+                              {synonym.word}
+                              {synonym.categories.length > 0 && (
+                                <span className="ml-1 text-[10px] font-black">
+                                  {synonym.categories.join("/")}
+                                </span>
+                              )}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                </div>
+
+                <span className="sr-only">
+                  {isRevealed ? "grade this card" : "tap card to reveal"}
+                </span>
+              </>
+            ) : (
+              <>
+                <span />
+                <span className="flex min-h-0 items-center overflow-y-auto text-5xl font-black leading-tight">
+                  no words saved
+                </span>
+                <span />
+              </>
+            )}
+          </div>
+
+          <div className="grid content-end px-3 pb-3 group-hover:bg-lime-100 min-[380px]:px-4 min-[380px]:pb-4">
+            {isRevealed && currentWord ? (
+              <div className="grid gap-3">
+                {currentDefinitionOptions.length > 1 && (
+                  <div className="grid grid-cols-[auto_1fr_auto] items-center gap-2">
+                    <button
+                      aria-label="Previous definition"
+                      className="h-10 w-10 border-4 border-black bg-white font-black hover:bg-lime-200 focus:bg-lime-200"
+                      onClick={() => previewDefinition(currentWord.id, -1)}
+                      type="button"
+                    >
+                      ←
+                    </button>
+                    <div className="flex min-w-0 items-center justify-center gap-2">
+                      <p className="min-w-0 text-center font-mono text-xs font-black uppercase">
+                        definition {currentDefinitionIndex + 1} /{" "}
+                        {currentDefinitionOptions.length}
+                      </p>
+                      <button
+                        aria-label={
+                          currentDefinitionIndex ===
+                          getDefinitionIndex(currentWord)
+                            ? "Selected definition"
+                            : "Select definition"
+                        }
+                        className="h-8 w-8 border-4 border-black bg-white font-black hover:bg-lime-200 focus:bg-lime-200 disabled:bg-lime-300"
+                        disabled={
+                          currentDefinitionIndex ===
+                          getDefinitionIndex(currentWord)
+                        }
+                        onClick={() =>
+                          selectPreviewDefinition(currentWord.id)
+                        }
+                        type="button"
+                      >
+                        {currentDefinitionIndex ===
+                        getDefinitionIndex(currentWord)
+                          ? "✓"
+                          : "+"}
+                      </button>
+                    </div>
+                    <button
+                      aria-label="Next definition"
+                      className="h-10 w-10 border-4 border-black bg-white font-black hover:bg-lime-200 focus:bg-lime-200"
+                      onClick={() => previewDefinition(currentWord.id, 1)}
+                      type="button"
+                    >
+                      →
+                    </button>
+                  </div>
+                )}
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    className="border-4 border-black bg-white px-3 py-4 text-sm font-black uppercase hover:bg-lime-200 focus:bg-lime-200 min-[380px]:text-base sm:px-4 sm:py-5"
+                    disabled={!isRevealed || !currentWord}
+                    onClick={() => markPractice("known")}
+                    type="button"
+                  >
+                    Knew it
+                  </button>
+                  <button
+                    className="border-4 border-black bg-white px-3 py-4 text-sm font-black uppercase hover:bg-lime-200 focus:bg-lime-200 min-[380px]:text-base sm:px-4 sm:py-5"
+                    disabled={!isRevealed || !currentWord}
+                    onClick={() => markPractice("review")}
+                    type="button"
+                  >
+                    Wasn&apos;t sure
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <p className="px-4 py-3 text-center font-mono text-sm font-black uppercase">
+                tap card to reveal
+              </p>
+            )}
+          </div>
+        </div>
+
+        <aside className="flex flex-col gap-4">
+          <div className="border-4 border-black p-4">
+            <p className="font-mono text-xs uppercase">stats</p>
+            <p className="mt-4 font-mono text-sm">
+              Seen {currentWord?.seenCount ?? 0} / Known{" "}
+              {currentWord?.knownCount ?? 0} / Review{" "}
+              {currentWord?.reviewCount ?? 0}
+            </p>
+          </div>
+        </aside>
+      </div>
+    </div>
+  );
+}
