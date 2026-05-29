@@ -12,9 +12,60 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const seoDescription =
+  "word of the day lists are great, but without practice you forget them. wotd turns new words into a local review deck.";
+
 export const metadata: Metadata = {
-  title: "wotd",
-  description: "A local word of the day practice deck.",
+  title: {
+    default: "wotd - Local vocabulary practice deck",
+    template: "%s | wotd",
+  },
+  description: seoDescription,
+  applicationName: "wotd",
+  authors: [{ name: "nuua", url: "https://github.com/drstuggels" }],
+  creator: "nuua",
+  publisher: "nuua",
+  keywords: [
+    "vocabulary practice",
+    "word of the day",
+    "flashcards",
+    "dictionary",
+    "synonyms",
+    "local-first app",
+  ],
+  category: "education",
+  manifest: "/manifest.webmanifest",
+  icons: {
+    icon: [
+      { url: "/icon.svg", type: "image/svg+xml" },
+      { url: "/wotd-icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/wotd-icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [{ url: "/wotd-icon-192.png", sizes: "192x192", type: "image/png" }],
+  },
+  openGraph: {
+    title: "wotd - Local vocabulary practice deck",
+    description: seoDescription,
+    siteName: "wotd",
+    locale: "en_US",
+    type: "website",
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+      "max-video-preview": -1,
+    },
+  },
+  twitter: {
+    card: "summary",
+    title: "wotd - Local vocabulary practice deck",
+    description: seoDescription,
+  },
 };
 
 export default function RootLayout({

@@ -1,7 +1,7 @@
 {
   "name": "wotd",
   "short_name": "wotd",
-  "description": "A local word of the day practice deck.",
+  "description": "word of the day lists are great, but without practice you forget them. wotd turns new words into a local review deck.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
