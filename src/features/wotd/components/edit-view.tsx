@@ -2,6 +2,7 @@
 
 import type { FormEvent } from "react";
 import { ExampleBrowser } from "./example-browser";
+import { RelatedWordBox } from "./related-word-box";
 import { editPages, prebuiltWordSets } from "../constants";
 import type {
   AppSettings,
@@ -17,6 +18,7 @@ import {
   getDefinitionExamples,
   getDefinitionIndex,
   getDefinitionOptions,
+  getNymWords,
   getVisibleSynonyms,
   parseWordList,
 } from "../words";
@@ -80,7 +82,9 @@ export function EditView({
         {editPages.map((item) => (
           <button
             className={`min-w-0 border-r-4 border-black px-2 py-3 text-sm font-black uppercase last:border-r-0 hover:bg-lime-200 sm:px-3 sm:text-base ${
-              editPage === item ? "bg-lime-300" : "bg-white"
+              editPage === item
+                ? "bg-black text-white hover:bg-black focus:bg-black"
+                : "bg-white"
             }`}
             key={item}
             onClick={() => {
@@ -165,6 +169,17 @@ export function EditView({
                   definition?.synonyms,
                   appSettings,
                 );
+                const forms =
+                  definition?.forms?.map((form) => ({
+                    tags: form.tags,
+                    word: form.form,
+                  })) ?? [];
+                const nyms = getNymWords(definition);
+                const hasRelatedWords =
+                  visibleSynonyms.length > 0 ||
+                  (definition?.linkedWords?.length ?? 0) > 0 ||
+                  forms.length > 0 ||
+                  nyms.length > 0;
                 const partsOfSpeech = formatPartsOfSpeech(word);
 
                 return (
@@ -191,7 +206,10 @@ export function EditView({
                       </button>
                     </div>
 
-                    <p className="mt-4 max-w-3xl text-lg font-semibold [overflow-wrap:anywhere]">
+                    <p
+                      className="carousel-swap mt-4 max-w-3xl text-lg font-semibold [overflow-wrap:anywhere]"
+                      key={`${word.id}-definition-${definitionIndex}`}
+                    >
                       {definition?.definition}
                     </p>
                     {definition && (
@@ -206,32 +224,34 @@ export function EditView({
                         />
                       </div>
                     )}
-                    {visibleSynonyms.length > 0 && (
-                        <div className="mt-4 min-w-0">
-                          <p className="font-mono text-xs uppercase">
-                            synonyms
-                          </p>
-                          <div className="mt-2 flex flex-wrap gap-2">
-                            {visibleSynonyms.map((synonym) => (
-                              <button
-                                className="min-w-0 break-words border-2 border-black bg-white px-2 py-1 font-mono text-xs uppercase hover:bg-lime-200 focus:bg-lime-200"
-                                key={synonym.word}
-                                onClick={() => openSynonym(synonym)}
-                                type="button"
-                              >
-                                {synonym.word}
-                                {synonym.categories.length > 0 && (
-                                  <span className="ml-1 text-[10px] font-black">
-                                    {synonym.categories.join("/")}
-                                  </span>
-                                )}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      )}
+                    {hasRelatedWords && (
+                      <div className="mt-4 grid min-w-0 gap-3 sm:grid-cols-2">
+                        <RelatedWordBox
+                          items={visibleSynonyms}
+                          label="synonyms"
+                          openSynonym={openSynonym}
+                        />
+                        <RelatedWordBox
+                          items={definition?.linkedWords ?? []}
+                          label="linked words"
+                          openSynonym={openSynonym}
+                        />
+                        <RelatedWordBox
+                          collapsible
+                          items={forms}
+                          label="word forms"
+                          openSynonym={openSynonym}
+                        />
+                        <RelatedWordBox
+                          collapsible
+                          items={nyms}
+                          label="nyms"
+                          openSynonym={openSynonym}
+                        />
+                      </div>
+                    )}
                     {definitions.length > 1 && (
-                      <div className="mt-4 grid min-w-0 grid-cols-[auto_1fr_auto] items-center gap-2">
+                      <div className="carousel-controls mt-4 grid min-w-0 grid-cols-[auto_1fr_auto] items-center gap-2">
                         <button
                           aria-label="Previous definition"
                           className="h-10 w-10 border-4 border-black bg-white font-black hover:bg-lime-200 focus:bg-lime-200"
@@ -241,7 +261,10 @@ export function EditView({
                           ←
                         </button>
                         <div className="flex min-w-0 items-center justify-center gap-2">
-                          <p className="min-w-0 text-center font-mono text-[10px] font-black uppercase sm:text-xs">
+                          <p
+                            className="carousel-swap min-w-0 text-center font-mono text-[10px] font-black uppercase sm:text-xs"
+                            key={`${word.id}-definition-label-${definitionIndex}`}
+                          >
                             definition {definitionIndex + 1} /{" "}
                             {definitions.length}
                           </p>
@@ -251,7 +274,7 @@ export function EditView({
                                 ? "Selected definition"
                                 : "Select definition"
                             }
-                            className="h-8 w-8 border-4 border-black bg-white font-black hover:bg-lime-200 focus:bg-lime-200 disabled:bg-lime-300"
+                            className="h-8 w-8 border-4 border-black bg-white font-black hover:bg-lime-200 focus:bg-lime-200 disabled:bg-black disabled:text-white"
                             disabled={
                               definitionIndex === getDefinitionIndex(word)
                             }

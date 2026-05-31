@@ -3,7 +3,17 @@ export type EditPage = "words" | "bulk";
 export type HiddenField = "word" | "definition";
 export type PracticeMark = "known" | "review";
 export type PracticeDirection = "word-first" | "definition-first" | "random";
+export type PracticePromptDirection = Exclude<PracticeDirection, "random">;
 export type SettingsPage = "data" | "synonyms" | "backup";
+export type PracticeStats = {
+  seenCount: number;
+  knownCount: number;
+  reviewCount: number;
+  lastPracticedAt?: string;
+};
+export type DirectionPracticeStats = Partial<
+  Record<PracticePromptDirection, PracticeStats>
+>;
 export type PrebuiltWordSet = {
   description: string;
   id: string;
@@ -33,6 +43,7 @@ export type SavedWord = {
   knownCount: number;
   reviewCount: number;
   lastPracticedAt?: string;
+  practiceStats?: DirectionPracticeStats;
 };
 
 export type DefinitionOption = {
@@ -42,6 +53,11 @@ export type DefinitionOption = {
   examples?: ExampleOption[];
   source?: "datamuse" | "wiktapi";
   synonyms?: StoredSynonym[];
+  linkedWords?: RelatedWordOption[];
+  forms?: WordFormOption[];
+  antonyms?: RelatedWordOption[];
+  hypernyms?: RelatedWordOption[];
+  hyponyms?: RelatedWordOption[];
 };
 
 export type ExampleOption = {
@@ -60,6 +76,16 @@ export type SynonymOption = {
   categories: SynonymCategory[];
 };
 
+export type RelatedWordOption = {
+  word: string;
+  tags: string[];
+};
+
+export type WordFormOption = {
+  form: string;
+  tags: string[];
+};
+
 export type WiktApiExample = {
   bold_text_offsets?: Array<[number, number]>;
   ref?: string;
@@ -72,14 +98,29 @@ export type WiktApiSynonym = {
   tags?: string[];
 };
 
+export type WiktApiRelatedWord = {
+  word?: string;
+  tags?: string[];
+};
+
+export type WiktApiForm = {
+  form?: string;
+  tags?: string[];
+};
+
 export type WiktApiSense = {
   glosses?: string[];
   examples?: Array<string | WiktApiExample>;
   synonyms?: WiktApiSynonym[];
+  links?: Array<[string, string]>;
+  antonyms?: WiktApiRelatedWord[];
+  hypernyms?: WiktApiRelatedWord[];
+  hyponyms?: WiktApiRelatedWord[];
 };
 
 export type WiktApiEntry = {
   pos?: string;
+  forms?: WiktApiForm[];
   senses?: WiktApiSense[];
   synonyms?: WiktApiSynonym[];
 };

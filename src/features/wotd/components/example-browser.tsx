@@ -69,23 +69,32 @@ export function ExampleBrowser({ examples }: { examples: ExampleOption[] }) {
   }
 
   return (
-    <div className="border-4 border-black bg-white p-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
+    <div className="soft-reveal border-4 border-black bg-white p-4">
+      <div
+        className="carousel-swap flex flex-wrap items-center justify-between gap-2"
+        key={`example-heading-${safeIndex}`}
+      >
         <p className="font-mono text-xs uppercase">examples</p>
         <p className="font-mono text-[10px] uppercase text-neutral-600">
           {[example.year, example.type].filter(Boolean).join(" · ")}
         </p>
       </div>
-      <p className="mt-2 font-mono text-sm leading-relaxed">
+      <p
+        className="carousel-swap mt-2 font-mono text-sm leading-relaxed"
+        key={`example-text-${safeIndex}`}
+      >
         {renderExampleText(example)}
       </p>
       {example.ref && (
-        <p className="mt-3 line-clamp-2 font-mono text-[10px] uppercase text-neutral-600">
+        <p
+          className="carousel-swap mt-3 line-clamp-2 font-mono text-[10px] uppercase text-neutral-600"
+          key={`example-ref-${safeIndex}`}
+        >
           {formatExampleRef(example.ref)}
         </p>
       )}
       {examples.length > 1 && (
-        <div className="mt-4 flex items-center justify-between gap-3">
+        <div className="carousel-controls mt-4 flex items-center justify-between gap-3">
           <button
             aria-label="Previous example"
             className="border-2 border-black bg-white px-2 py-1 font-mono text-xs font-black uppercase hover:bg-lime-200 focus:bg-lime-200"

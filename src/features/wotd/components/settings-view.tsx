@@ -46,7 +46,9 @@ export function SettingsView({
         {settingsPages.map((item) => (
           <button
             className={`border-r-4 border-black px-3 py-3 font-black uppercase last:border-r-0 hover:bg-lime-200 ${
-              settingsPage === item ? "bg-lime-300" : "bg-white"
+              settingsPage === item
+                ? "bg-black text-white hover:bg-black focus:bg-black"
+                : "bg-white"
             }`}
             key={item}
             onClick={() => {
@@ -117,7 +119,7 @@ export function SettingsView({
                 aria-pressed={synonymCategorySettings[item.category]}
                 className={`border-4 border-black p-4 text-left hover:bg-lime-200 ${
                   synonymCategorySettings[item.category]
-                    ? "bg-lime-300"
+                    ? "bg-black text-white hover:bg-black focus:bg-black"
                     : "bg-white"
                 }`}
                 key={item.category}

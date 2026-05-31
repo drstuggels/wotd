@@ -3,15 +3,23 @@ import type {
   AppSettings,
   DefinitionLookupResult,
   DefinitionOption,
+  DirectionPracticeStats,
   ExampleOption,
   HiddenField,
   PracticeDirection,
+  PracticeMark,
+  PracticePromptDirection,
+  PracticeStats,
+  RelatedWordOption,
   SavedWord,
   StoredSynonym,
   SynonymCategory,
   SynonymOption,
   WiktApiExample,
+  WiktApiForm,
+  WiktApiRelatedWord,
   WiktApiSynonym,
+  WordFormOption,
 } from "./types";
 
 export function normalizeWord(value: string) {
@@ -20,6 +28,10 @@ export function normalizeWord(value: string) {
 
 export function normalizeTag(value: string) {
   return normalizeWord(value).replace(/\s+/g, "-");
+}
+
+function normalizeTags(tags: string[] = []) {
+  return Array.from(new Set(tags.map((tag) => tag.trim()).filter(Boolean)));
 }
 
 export function parseWordList(value: string) {
@@ -120,9 +132,7 @@ export function normalizeSynonym(synonym: StoredSynonym): SynonymOption | null {
     return null;
   }
 
-  const tags = Array.from(
-    new Set((synonym.tags ?? []).map((tag) => tag.trim()).filter(Boolean)),
-  );
+  const tags = normalizeTags(synonym.tags);
   return {
     word,
     tags,
@@ -202,9 +212,7 @@ export function getSynonymsFromApi(synonyms: WiktApiSynonym[], word: string) {
         return [];
       }
 
-      const tags = (synonym.tags ?? [])
-        .map((tag) => tag.trim())
-        .filter(Boolean);
+      const tags = normalizeTags(synonym.tags);
 
       return [
         {
@@ -215,6 +223,109 @@ export function getSynonymsFromApi(synonyms: WiktApiSynonym[], word: string) {
       ];
     }),
   );
+}
+
+export function getSortedRelatedWords(words: RelatedWordOption[] = []) {
+  const deduped = new Map<string, RelatedWordOption>();
+
+  for (const item of words) {
+    const word = normalizeWord(item.word);
+    if (!word) {
+      continue;
+    }
+
+    const tags = normalizeTags(item.tags);
+    const existing = deduped.get(word);
+    if (existing) {
+      deduped.set(word, {
+        word,
+        tags: Array.from(new Set([...existing.tags, ...tags])),
+      });
+      continue;
+    }
+
+    deduped.set(word, { word, tags });
+  }
+
+  return Array.from(deduped.values()).sort((a, b) => {
+    const tagScore = a.tags.length - b.tags.length;
+    if (tagScore !== 0) {
+      return tagScore;
+    }
+
+    return a.word.localeCompare(b.word);
+  });
+}
+
+export function getRelatedWordsFromApi(
+  words: WiktApiRelatedWord[] = [],
+  word: string,
+) {
+  const normalizedBase = normalizeWord(word);
+
+  return getSortedRelatedWords(
+    words.flatMap((item) => {
+      const text = normalizeWord(item.word ?? "");
+
+      if (!text || text === normalizedBase) {
+        return [];
+      }
+
+      return [{ word: text, tags: normalizeTags(item.tags) }];
+    }),
+  );
+}
+
+export function getLinkedWordsFromApi(
+  links: Array<[string, string]> = [],
+  word: string,
+) {
+  const normalizedBase = normalizeWord(word);
+
+  return getSortedRelatedWords(
+    links.flatMap(([display, target]) => {
+      const text = normalizeWord(display || target);
+
+      if (!text || text === normalizedBase) {
+        return [];
+      }
+
+      return [{ word: text, tags: [] }];
+    }),
+  );
+}
+
+export function getFormsFromApi(forms: WiktApiForm[] = [], word: string) {
+  const normalizedBase = normalizeWord(word);
+  const deduped = new Map<string, WordFormOption>();
+
+  for (const item of forms) {
+    const form = normalizeWord(item.form ?? "");
+    if (!form || form === normalizedBase) {
+      continue;
+    }
+
+    const tags = normalizeTags(item.tags);
+    const existing = deduped.get(form);
+    if (existing) {
+      deduped.set(form, {
+        form,
+        tags: Array.from(new Set([...existing.tags, ...tags])),
+      });
+      continue;
+    }
+
+    deduped.set(form, { form, tags });
+  }
+
+  return Array.from(deduped.values()).sort((a, b) => {
+    const tagScore = a.tags.length - b.tags.length;
+    if (tagScore !== 0) {
+      return tagScore;
+    }
+
+    return a.form.localeCompare(b.form);
+  });
 }
 
 export function newId() {
@@ -302,15 +413,15 @@ export function getSortedExamples(examples: Array<string | WiktApiExample> = [])
     });
 
   return normalizedExamples.sort((a, b) => {
-      const aYear = a.year ?? 0;
-      const bYear = b.year ?? 0;
+    const aYear = a.year ?? 0;
+    const bYear = b.year ?? 0;
 
-      if (aYear !== bYear) {
-        return bYear - aYear;
-      }
+    if (aYear !== bYear) {
+      return bYear - aYear;
+    }
 
-      return a.text.length - b.text.length;
-    });
+    return a.text.length - b.text.length;
+  });
 }
 
 export function formatDate(value?: string) {
@@ -323,6 +434,158 @@ export function formatDate(value?: string) {
     day: "numeric",
     year: "numeric",
   }).format(new Date(value));
+}
+
+export function emptyPracticeStats(): PracticeStats {
+  return {
+    seenCount: 0,
+    knownCount: 0,
+    reviewCount: 0,
+  };
+}
+
+export function promptDirectionFromHiddenField(
+  hiddenField: HiddenField,
+): PracticePromptDirection {
+  return hiddenField === "definition" ? "word-first" : "definition-first";
+}
+
+export function getPracticeStats(
+  word: SavedWord | null | undefined,
+  hiddenField: HiddenField,
+) {
+  const promptDirection = promptDirectionFromHiddenField(hiddenField);
+  const legacyStats = word?.practiceStats as
+    | Partial<Record<HiddenField, PracticeStats>>
+    | undefined;
+
+  return (
+    word?.practiceStats?.[promptDirection] ??
+    legacyStats?.[hiddenField] ??
+    emptyPracticeStats()
+  );
+}
+
+export function getDeckPracticeStats(
+  words: SavedWord[],
+  hiddenField: HiddenField,
+) {
+  return words.reduce<PracticeStats>(
+    (total, word) => {
+      const stats = getPracticeStats(word, hiddenField);
+      const currentLastPracticedAt = total.lastPracticedAt
+        ? new Date(total.lastPracticedAt).getTime()
+        : 0;
+      const nextLastPracticedAt = stats.lastPracticedAt
+        ? new Date(stats.lastPracticedAt).getTime()
+        : 0;
+
+      return {
+        seenCount: total.seenCount + stats.seenCount,
+        knownCount: total.knownCount + stats.knownCount,
+        reviewCount: total.reviewCount + stats.reviewCount,
+        lastPracticedAt:
+          nextLastPracticedAt > currentLastPracticedAt
+            ? stats.lastPracticedAt
+            : total.lastPracticedAt,
+      };
+    },
+    emptyPracticeStats(),
+  );
+}
+
+export function getTotalPracticeStats(words: SavedWord[]) {
+  return words.reduce<PracticeStats>(
+    (total, word) => {
+      const currentLastPracticedAt = total.lastPracticedAt
+        ? new Date(total.lastPracticedAt).getTime()
+        : 0;
+      const nextLastPracticedAt = word.lastPracticedAt
+        ? new Date(word.lastPracticedAt).getTime()
+        : 0;
+
+      return {
+        seenCount: total.seenCount + word.seenCount,
+        knownCount: total.knownCount + word.knownCount,
+        reviewCount: total.reviewCount + word.reviewCount,
+        lastPracticedAt:
+          nextLastPracticedAt > currentLastPracticedAt
+            ? word.lastPracticedAt
+            : total.lastPracticedAt,
+      };
+    },
+    emptyPracticeStats(),
+  );
+}
+
+export function addPracticeMarkToStats(
+  stats: PracticeStats | undefined,
+  mark: PracticeMark,
+  now: string,
+): PracticeStats {
+  const current = stats ?? emptyPracticeStats();
+
+  return {
+    seenCount: current.seenCount + 1,
+    knownCount: mark === "known" ? current.knownCount + 1 : current.knownCount,
+    reviewCount:
+      mark === "review" ? current.reviewCount + 1 : current.reviewCount,
+    lastPracticedAt: now,
+  };
+}
+
+export function addPracticeMarkToDirectionStats(
+  stats: DirectionPracticeStats | undefined,
+  hiddenField: HiddenField,
+  mark: PracticeMark,
+  now: string,
+): DirectionPracticeStats {
+  const promptDirection = promptDirectionFromHiddenField(hiddenField);
+
+  return {
+    ...stats,
+    [promptDirection]: addPracticeMarkToStats(
+      stats?.[promptDirection],
+      mark,
+      now,
+    ),
+  };
+}
+
+export function promptDirectionLabel(hiddenField: HiddenField) {
+  return promptDirectionFromHiddenField(hiddenField).replace("-", " ");
+}
+
+export function practicePriorityScore(
+  word: SavedWord,
+  hiddenField: HiddenField,
+  hashValue: number,
+) {
+  const stats = getPracticeStats(word, hiddenField);
+  const group =
+    stats.seenCount === 0
+      ? 0
+      : stats.knownCount === 0
+        ? 10_000
+        : 20_000;
+  const lastPracticedAt = stats.lastPracticedAt ?? word.lastPracticedAt;
+  const practicedAt = lastPracticedAt
+    ? new Date(lastPracticedAt).getTime()
+    : 0;
+  const ageInDays = practicedAt
+    ? Math.max(0, (Date.now() - practicedAt) / 86_400_000)
+    : 365;
+  const recencyPenalty = Math.max(0, 14 - ageInDays) * 25;
+
+  return (
+    group +
+    stats.seenCount * 120 +
+    stats.knownCount * 320 -
+    stats.reviewCount * 40 +
+    word.seenCount * 6 +
+    recencyPenalty +
+    hashValue / 0xffffffff
+  );
 }
 
 export function createSavedWord(
@@ -345,6 +608,7 @@ export function createSavedWord(
     seenCount: 0,
     knownCount: 0,
     reviewCount: 0,
+    practiceStats: {},
   };
 }
 
@@ -444,4 +708,25 @@ export function getDefinitionExamples(definition?: DefinitionOption | null) {
   }
 
   return definition.example ? [{ text: definition.example }] : [];
+}
+
+export function getNymWords(definition?: DefinitionOption | null) {
+  if (!definition) {
+    return [];
+  }
+
+  return getSortedRelatedWords([
+    ...(definition.antonyms ?? []).map((item) => ({
+      ...item,
+      tags: ["antonym", ...item.tags],
+    })),
+    ...(definition.hypernyms ?? []).map((item) => ({
+      ...item,
+      tags: ["hypernym", ...item.tags],
+    })),
+    ...(definition.hyponyms ?? []).map((item) => ({
+      ...item,
+      tags: ["hyponym", ...item.tags],
+    })),
+  ]);
 }

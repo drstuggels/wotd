@@ -5,7 +5,14 @@ import type {
   SuggestionEntry,
   WiktApiResponse,
 } from "./types";
-import { getSortedExamples, getSynonymsFromApi, normalizeWord } from "./words";
+import {
+  getFormsFromApi,
+  getLinkedWordsFromApi,
+  getRelatedWordsFromApi,
+  getSortedExamples,
+  getSynonymsFromApi,
+  normalizeWord,
+} from "./words";
 
 function parseDatamuseDefinition(rawDefinition: string): DefinitionOption | null {
   const [partOfSpeech, ...definitionParts] = rawDefinition.split("\t");
@@ -20,6 +27,11 @@ function parseDatamuseDefinition(rawDefinition: string): DefinitionOption | null
     partOfSpeech: normalizeWord(partOfSpeech),
     source: "datamuse",
     synonyms: [],
+    linkedWords: [],
+    forms: [],
+    antonyms: [],
+    hypernyms: [],
+    hyponyms: [],
   };
 }
 
@@ -89,8 +101,10 @@ async function fetchWiktApiDefinition(
 
   const entries = (await response.json()) as WiktApiResponse;
   const definitions: DefinitionOption[] = (entries.entries ?? [])
-    .flatMap((entry) =>
-      (entry.senses ?? []).flatMap((sense) =>
+    .flatMap((entry) => {
+      const forms = getFormsFromApi(entry.forms, word);
+
+      return (entry.senses ?? []).flatMap((sense) =>
         (sense.glosses ?? []).flatMap((gloss) => {
           const text = gloss.trim();
 
@@ -104,6 +118,10 @@ async function fetchWiktApiDefinition(
             [...(sense.synonyms ?? []), ...(entry.synonyms ?? [])],
             word,
           );
+          const linkedWords = getLinkedWordsFromApi(sense.links, word);
+          const antonyms = getRelatedWordsFromApi(sense.antonyms, word);
+          const hypernyms = getRelatedWordsFromApi(sense.hypernyms, word);
+          const hyponyms = getRelatedWordsFromApi(sense.hyponyms, word);
 
           const definitionOption: DefinitionOption = {
             definition: text,
@@ -112,12 +130,17 @@ async function fetchWiktApiDefinition(
             partOfSpeech: entry.pos,
             source: "wiktapi",
             synonyms,
+            linkedWords,
+            forms,
+            antonyms,
+            hypernyms,
+            hyponyms,
           };
 
           return [definitionOption];
         }),
-      ),
-    )
+      );
+    })
     .filter(
       (definition, index, allDefinitions) =>
         allDefinitions.findIndex(

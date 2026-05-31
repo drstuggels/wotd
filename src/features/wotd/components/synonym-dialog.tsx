@@ -1,6 +1,7 @@
 "use client";
 
 import { ExampleBrowser } from "./example-browser";
+import { RelatedWordBox } from "./related-word-box";
 import type {
   DefinitionLookupResult,
   DefinitionOption,
@@ -9,6 +10,7 @@ import type {
 import {
   formatDefinitionSource,
   getDefinitionExamples,
+  getNymWords,
 } from "../words";
 
 type SynonymDialogProps = {
@@ -44,16 +46,31 @@ export function SynonymDialog({
   synonymLookupError,
   synonymModalStatus,
 }: SynonymDialogProps) {
+  const synonymDefinitionForms =
+    synonymDefinition?.forms?.map((form) => ({
+      tags: form.tags,
+      word: form.form,
+    })) ?? [];
+  const synonymDefinitionNyms = getNymWords(synonymDefinition);
+  const selectedWordMetadata = [
+    selectedSynonym.tags.length
+      ? `tags: ${selectedSynonym.tags.join(", ")}`
+      : "",
+    selectedSynonym.categories.length
+      ? `categories: ${selectedSynonym.categories.join(", ")}`
+      : "",
+  ].filter(Boolean);
+
   return (
     <div
       aria-labelledby="synonym-dialog-title"
       aria-modal="true"
-      className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-2 sm:p-4"
+      className="modal-backdrop fixed inset-0 z-50 grid place-items-center bg-black/60 p-2 sm:p-4"
       onClick={closeSynonym}
       role="dialog"
     >
       <div
-        className="grid max-h-[96dvh] w-full max-w-2xl min-w-0 grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden border-4 border-black bg-white sm:max-h-[90dvh]"
+        className="modal-card grid max-h-[96dvh] w-full max-w-2xl min-w-0 grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden border-4 border-black bg-white sm:max-h-[90dvh]"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="min-w-0 border-b-4 border-black p-3 sm:p-4">
@@ -68,7 +85,7 @@ export function SynonymDialog({
               </h2>
             </div>
             <button
-              aria-label="Close synonym details"
+              aria-label="Close word details"
               className="h-10 w-10 shrink-0 border-4 border-black bg-white font-black hover:bg-lime-200 focus:bg-lime-200"
               onClick={closeSynonym}
               type="button"
@@ -77,16 +94,11 @@ export function SynonymDialog({
             </button>
           </div>
 
-          <p className="mt-3 break-words font-mono text-xs uppercase text-neutral-600">
-            Tags:{" "}
-            {selectedSynonym.tags.length
-              ? selectedSynonym.tags.join(", ")
-              : "none"}{" "}
-            / Categories:{" "}
-            {selectedSynonym.categories.length
-              ? selectedSynonym.categories.join(", ")
-              : "default"}
-          </p>
+          {selectedWordMetadata.length > 0 && (
+            <p className="mt-3 break-words font-mono text-xs uppercase text-neutral-600">
+              {selectedWordMetadata.join(" / ")}
+            </p>
+          )}
         </div>
 
         <div className="grid min-h-0 min-w-0 content-start gap-3 overflow-y-auto p-3 sm:gap-4 sm:p-4">
@@ -108,13 +120,16 @@ export function SynonymDialog({
           {synonymLookupError && (
             <div className="min-w-0 border-4 border-black p-3 sm:p-4">
               <p className="font-mono text-sm uppercase">
-              {synonymLookupError}
+                {synonymLookupError}
               </p>
             </div>
           )}
           {synonymDefinition && (
             <>
-              <div className="min-w-0 border-4 border-black p-3 sm:p-4">
+              <div
+                className="carousel-swap min-w-0 border-4 border-black p-3 sm:p-4"
+                key={`${selectedSynonym.word}-definition-${safeSynonymDefinitionIndex}`}
+              >
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="font-mono text-xs uppercase">definition</p>
                   <span className="font-mono text-[10px] uppercase text-neutral-600">
@@ -132,36 +147,35 @@ export function SynonymDialog({
                 />
               )}
 
-              {synonymDefinitionSynonyms.length > 0 && (
-                <div className="min-w-0 border-4 border-black p-3 sm:p-4">
-                  <p className="font-mono text-xs uppercase">synonyms</p>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {synonymDefinitionSynonyms.map((synonym) => (
-                      <button
-                        className="min-w-0 break-words border-2 border-black bg-white px-2 py-1 font-mono text-xs uppercase hover:bg-lime-200 focus:bg-lime-200"
-                        key={synonym.word}
-                        onClick={() => openSynonym(synonym)}
-                        type="button"
-                      >
-                        {synonym.word}
-                        {synonym.categories.length > 0 && (
-                          <span className="ml-1 text-[10px] font-black">
-                            {synonym.categories.join("/")}
-                          </span>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
+              <RelatedWordBox
+                items={synonymDefinitionSynonyms}
+                label="synonyms"
+                openSynonym={openSynonym}
+              />
+              <RelatedWordBox
+                items={synonymDefinition.linkedWords ?? []}
+                label="linked words"
+                openSynonym={openSynonym}
+              />
+              <RelatedWordBox
+                collapsible
+                items={synonymDefinitionForms}
+                label="word forms"
+                openSynonym={openSynonym}
+              />
+              <RelatedWordBox
+                collapsible
+                items={synonymDefinitionNyms}
+                label="nyms"
+                openSynonym={openSynonym}
+              />
             </>
           )}
         </div>
 
         <div className="min-w-0 border-t-4 border-black p-3 sm:p-4">
           {synonymDefinitionOptions.length > 1 && (
-            <div className="mb-3 grid min-w-0 grid-cols-[auto_1fr_auto] items-center gap-2">
+            <div className="carousel-controls mb-3 grid min-w-0 grid-cols-[auto_1fr_auto] items-center gap-2">
               <button
                 aria-label="Previous definition"
                 className="h-10 w-10 border-4 border-black bg-white font-black hover:bg-lime-200 focus:bg-lime-200"
@@ -170,7 +184,10 @@ export function SynonymDialog({
               >
                 ←
               </button>
-              <p className="min-w-0 text-center font-mono text-[10px] font-black uppercase sm:text-xs">
+              <p
+                className="carousel-swap min-w-0 text-center font-mono text-[10px] font-black uppercase sm:text-xs"
+                key={`${selectedSynonym.word}-definition-label-${safeSynonymDefinitionIndex}`}
+              >
                 definition {safeSynonymDefinitionIndex + 1} /{" "}
                 {synonymDefinitionOptions.length}
               </p>

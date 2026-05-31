@@ -28,17 +28,21 @@ import type {
   View,
 } from "./types";
 import {
+  addPracticeMarkToDirectionStats,
   createSavedWord,
   getAllSynonyms,
+  getDeckPracticeStats,
   getDefinitionIndex,
   getDefinitionOptions,
   getHiddenField,
   getSavedSynonymCategories,
+  getTotalPracticeStats,
   getVisibleSynonyms,
   isAppSettings,
   isSavedWord,
   normalizeWord,
   parseWordList,
+  practicePriorityScore,
 } from "./words";
 
 function hashPracticePrompt(id: string, seed: number) {
@@ -70,6 +74,9 @@ export function WotdApp() {
   const [practiceIndex, setPracticeIndex] = useState(0);
   const [practiceShuffleSeed, setPracticeShuffleSeed] = useState(() =>
     Math.random(),
+  );
+  const [lastPracticedWordId, setLastPracticedWordId] = useState<string | null>(
+    null,
   );
   const [practiceDirection, setPracticeDirection] =
     useState<PracticeDirection>("word-first");
@@ -238,11 +245,25 @@ export function WotdApp() {
           definitions.some((definition) =>
             definition.definition.toLowerCase().includes(query),
           ) ||
-          definitions.some((definition) =>
-            getAllSynonyms(definition.synonyms).some((synonym) =>
-              synonym.word.includes(query),
-            ),
-          ) ||
+          definitions.some((definition) => {
+            const forms =
+              definition.forms?.map((form) => form.form) ?? [];
+            const relatedWords = [
+              ...(definition.linkedWords ?? []),
+              ...(definition.antonyms ?? []),
+              ...(definition.hypernyms ?? []),
+              ...(definition.hyponyms ?? []),
+            ].map((item) => item.word);
+
+            return (
+              getAllSynonyms(definition.synonyms).some((synonym) =>
+                synonym.word.includes(query),
+              ) ||
+              [...forms, ...relatedWords].some((item) =>
+                normalizeWord(item).includes(query),
+              )
+            );
+          }) ||
           partsOfSpeech.some((partOfSpeech) =>
             normalizeWord(partOfSpeech).includes(query),
           )
@@ -252,19 +273,41 @@ export function WotdApp() {
   }, [search, words]);
 
   const practiceWords = useMemo(
-    () =>
-      [...words].sort((a, b) => {
+    () => {
+      const sortedWords = [...words].sort((a, b) => {
         const score =
-          hashPracticePrompt(a.id, practiceShuffleSeed) -
-          hashPracticePrompt(b.id, practiceShuffleSeed);
+          practicePriorityScore(
+            a,
+            hiddenField,
+            hashPracticePrompt(a.id, practiceShuffleSeed),
+          ) -
+          practicePriorityScore(
+            b,
+            hiddenField,
+            hashPracticePrompt(b.id, practiceShuffleSeed),
+          );
 
         if (score !== 0) {
           return score;
         }
 
         return a.word.localeCompare(b.word);
-      }),
-    [practiceShuffleSeed, words],
+      });
+
+      if (!lastPracticedWordId || sortedWords.length < 2) {
+        return sortedWords;
+      }
+
+      const lastIndex = sortedWords.findIndex(
+        (word) => word.id === lastPracticedWordId,
+      );
+      if (lastIndex !== 0) {
+        return sortedWords;
+      }
+
+      return [...sortedWords.slice(1), sortedWords[0]];
+    },
+    [hiddenField, lastPracticedWordId, practiceShuffleSeed, words],
   );
 
   const safePracticeIndex = practiceWords.length
@@ -274,6 +317,18 @@ export function WotdApp() {
   const currentDefinitionOptions = getDefinitionOptions(currentWord);
   const currentDefinitionIndex = getPreviewDefinitionIndex(currentWord);
   const currentDefinition = currentDefinitionOptions[currentDefinitionIndex];
+  const wordFirstPracticeStats = useMemo(
+    () => getDeckPracticeStats(words, "definition"),
+    [words],
+  );
+  const definitionFirstPracticeStats = useMemo(
+    () => getDeckPracticeStats(words, "word"),
+    [words],
+  );
+  const totalPracticeStats = useMemo(
+    () => getTotalPracticeStats(words),
+    [words],
+  );
   const appSettings = useMemo(
     () => ({
       practiceDirection,
@@ -526,16 +581,26 @@ export function WotdApp() {
     }
 
     const now = new Date().toISOString();
+    const promptHiddenField = hiddenField;
+    const nextHiddenField = getHiddenField(practiceDirection);
+
     setWords((current) =>
       current.map((word) =>
         word.id === currentWord.id
           ? {
               ...word,
               seenCount: word.seenCount + 1,
-              knownCount: mark === "known" ? word.knownCount + 1 : word.knownCount,
+              knownCount:
+                mark === "known" ? word.knownCount + 1 : word.knownCount,
               reviewCount:
                 mark === "review" ? word.reviewCount + 1 : word.reviewCount,
               lastPracticedAt: now,
+              practiceStats: addPracticeMarkToDirectionStats(
+                word.practiceStats,
+                promptHiddenField,
+                mark,
+                now,
+              ),
               updatedAt: now,
             }
           : word,
@@ -547,12 +612,9 @@ export function WotdApp() {
       delete next[currentWord.id];
       return next;
     });
-    setHiddenField(getHiddenField(practiceDirection));
-    setPracticeIndex(
-      safePracticeIndex >= practiceWords.length - 1
-        ? 0
-        : safePracticeIndex + 1,
-    );
+    setHiddenField(nextHiddenField);
+    setLastPracticedWordId(currentWord.id);
+    setPracticeIndex(0);
   }
 
   function setDirection(direction: PracticeDirection) {
@@ -704,6 +766,7 @@ export function WotdApp() {
     if (window.confirm("Clear all saved words?")) {
       setWords([]);
       setPracticeIndex(0);
+      setLastPracticedWordId(null);
       setIsRevealed(false);
       setPreviewDefinitionIndices({});
       setPracticeShuffleSeed(Math.random());
@@ -785,8 +848,8 @@ export function WotdApp() {
   }
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-6xl flex-col sm:px-6 sm:py-4 lg:px-8">
-      <header className="bg-background sm:border-4 sm:border-black sm:bg-white">
+    <main className="app-shell mx-auto flex min-h-dvh w-full max-w-6xl flex-col sm:px-6 sm:py-4 lg:px-8">
+      <header className="app-header bg-background sm:border-4 sm:border-black sm:bg-white">
         <div className="flex flex-col justify-between gap-4 border-b-4 border-black p-3 sm:flex-row sm:items-end sm:p-4">
           <div className="min-w-0">
             <p className="font-mono text-xs uppercase">local vocabulary deck</p>
@@ -798,7 +861,9 @@ export function WotdApp() {
           {views.map((item) => (
             <button
               className={`border-r-4 border-black px-2 py-4 text-xs font-black uppercase last:border-r-0 hover:bg-lime-200 min-[380px]:text-sm sm:px-3 ${
-                view === item ? "bg-lime-300" : "bg-white"
+                view === item
+                  ? "bg-black text-white hover:bg-black focus:bg-black"
+                  : "bg-white"
               }`}
               key={item}
               onClick={() => navigateView(item)}
@@ -810,74 +875,83 @@ export function WotdApp() {
         </nav>
       </header>
 
-      <section className="flex-1 bg-background p-3 sm:border-x-4 sm:border-b-4 sm:border-black sm:bg-white sm:p-6">
+      <section className="app-panel flex-1 bg-background p-3 sm:border-x-4 sm:border-b-4 sm:border-black sm:bg-white sm:p-6">
         {view === "practice" && (
-          <PracticeView
-            currentDefinition={currentDefinition}
-            currentDefinitionIndex={currentDefinitionIndex}
-            currentDefinitionOptions={currentDefinitionOptions}
-            currentSynonyms={currentSynonyms}
-            currentWord={currentWord}
-            hiddenField={hiddenField}
-            isRevealed={isRevealed}
-            markPractice={markPractice}
-            openSynonym={openSynonym}
-            practiceDirection={practiceDirection}
-            previewDefinition={previewDefinition}
-            selectPreviewDefinition={selectPreviewDefinition}
-            setDirection={setDirection}
-            setIsRevealed={setIsRevealed}
-          />
+          <div className="view-swap" key="practice">
+            <PracticeView
+              currentDefinition={currentDefinition}
+              currentDefinitionIndex={currentDefinitionIndex}
+              currentDefinitionOptions={currentDefinitionOptions}
+              currentSynonyms={currentSynonyms}
+              currentWord={currentWord}
+              definitionFirstPracticeStats={definitionFirstPracticeStats}
+              hiddenField={hiddenField}
+              isRevealed={isRevealed}
+              markPractice={markPractice}
+              openSynonym={openSynonym}
+              practiceDirection={practiceDirection}
+              previewDefinition={previewDefinition}
+              selectPreviewDefinition={selectPreviewDefinition}
+              setDirection={setDirection}
+              setIsRevealed={setIsRevealed}
+              totalPracticeStats={totalPracticeStats}
+              wordFirstPracticeStats={wordFirstPracticeStats}
+            />
+          </div>
         )}
 
         {view === "edit" && (
-          <EditView
-            addPrebuiltWordSet={addPrebuiltWordSet}
-            appSettings={appSettings}
-            bulkWords={bulkWords}
-            deleteWord={deleteWord}
-            editPage={editPage}
-            filteredWords={filteredWords}
-            getPreviewDefinitionIndex={getPreviewDefinitionIndex}
-            handleAddWord={handleAddWord}
-            handleBulkAdd={handleBulkAdd}
-            isAdding={isAdding}
-            isBulkAdding={isBulkAdding}
-            newWord={newWord}
-            openSynonym={openSynonym}
-            previewDefinition={previewDefinition}
-            search={search}
-            selectPreviewDefinition={selectPreviewDefinition}
-            setBulkWords={setBulkWords}
-            setEditPage={navigateEditPage}
-            setNewWord={setNewWord}
-            setSearch={setSearch}
-            setStatus={setStatus}
-            setSuggestions={setSuggestions}
-            status={status}
-            suggestions={suggestions}
-          />
+          <div className="view-swap" key="edit">
+            <EditView
+              addPrebuiltWordSet={addPrebuiltWordSet}
+              appSettings={appSettings}
+              bulkWords={bulkWords}
+              deleteWord={deleteWord}
+              editPage={editPage}
+              filteredWords={filteredWords}
+              getPreviewDefinitionIndex={getPreviewDefinitionIndex}
+              handleAddWord={handleAddWord}
+              handleBulkAdd={handleBulkAdd}
+              isAdding={isAdding}
+              isBulkAdding={isBulkAdding}
+              newWord={newWord}
+              openSynonym={openSynonym}
+              previewDefinition={previewDefinition}
+              search={search}
+              selectPreviewDefinition={selectPreviewDefinition}
+              setBulkWords={setBulkWords}
+              setEditPage={navigateEditPage}
+              setNewWord={setNewWord}
+              setSearch={setSearch}
+              setStatus={setStatus}
+              setSuggestions={setSuggestions}
+              status={status}
+              suggestions={suggestions}
+            />
+          </div>
         )}
 
         {view === "settings" && (
-          <SettingsView
-            clearWords={clearWords}
-            exportedJson={exportedJson}
-            forceRefresh={forceRefresh}
-            forceRefreshAndClearWords={forceRefreshAndClearWords}
-            importValue={importValue}
-            importWords={importWords}
-            isRefetching={isRefetching}
-            refetchDefinitions={refetchDefinitions}
-            setImportValue={setImportValue}
-            setSettingsPage={navigateSettingsPage}
-            setStatus={setStatus}
-            settingsPage={settingsPage}
-            status={status}
-            synonymCategorySettings={synonymCategorySettings}
-            toggleSynonymCategory={toggleSynonymCategory}
-            words={words}
-          />
+          <div className="view-swap" key="settings">
+            <SettingsView
+              clearWords={clearWords}
+              exportedJson={exportedJson}
+              forceRefresh={forceRefresh}
+              forceRefreshAndClearWords={forceRefreshAndClearWords}
+              importValue={importValue}
+              importWords={importWords}
+              isRefetching={isRefetching}
+              refetchDefinitions={refetchDefinitions}
+              setImportValue={setImportValue}
+              setSettingsPage={navigateSettingsPage}
+              setStatus={setStatus}
+              settingsPage={settingsPage}
+              status={status}
+              synonymCategorySettings={synonymCategorySettings}
+              toggleSynonymCategory={toggleSynonymCategory}
+              words={words}
+            />
+          </div>
         )}
       </section>
 
@@ -899,7 +973,7 @@ export function WotdApp() {
           synonymModalStatus={synonymModalStatus}
         />
       )}
-      <footer className="px-3 py-4 text-center font-mono text-[10px] uppercase text-neutral-600 sm:px-0">
+      <footer className="app-footer px-3 py-4 text-center font-mono text-[10px] uppercase text-neutral-600 sm:px-0">
         made by{" "}
         <a
           className="underline decoration-2 underline-offset-2 hover:text-black focus:text-black"

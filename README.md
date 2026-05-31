@@ -45,10 +45,4 @@ CNAME wotd -> the Pages hostname shown by cf-deploy
 
 ## Todo
 
-- [ ] nicer colors
-- [ ] linked words
-- [ ] word forms
-- [ ] antonyms / hypernyms / hyponyms
-- [ ] collapsable sections?
-- [ ] animations?
-- [ ] translations?
+- [ ] gameify

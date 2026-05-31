@@ -1,13 +1,34 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f4f4f0;
-  --foreground: #050505;
+  --background: #b8b99a;
+  --foreground: #3d3022;
+  --surface: #eee4cf;
+  --prompt-surface: #f1d6a8;
+  --surface-muted: #ddd2b9;
+  --accent: #9bae68;
+  --accent-soft: #cad6a0;
+  --accent-pale: #e4dfb8;
+  --muted: #665f4f;
+  --muted-soft: #c6bea9;
+  --danger: #a45135;
+  --danger-strong: #853d2a;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-black: var(--foreground);
+  --color-white: var(--surface);
+  --color-lime-100: var(--accent-pale);
+  --color-lime-200: var(--accent-soft);
+  --color-lime-300: var(--accent);
+  --color-neutral-50: var(--surface-muted);
+  --color-neutral-200: var(--muted-soft);
+  --color-neutral-500: var(--muted);
+  --color-neutral-600: var(--muted);
+  --color-red-500: var(--danger);
+  --color-red-600: var(--danger-strong);
   --font-sans: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
 }
@@ -16,6 +37,7 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  overflow-x: clip;
 }
 
 button,
@@ -24,10 +46,241 @@ textarea {
   border-radius: 0;
 }
 
+input,
+textarea {
+  background: var(--surface);
+  color: var(--foreground);
+}
+
 button {
   cursor: pointer;
 }
 
 button:disabled {
   cursor: not-allowed;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes app-rise {
+    from {
+      opacity: 0;
+      transform: translateY(10px) scale(0.996);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  @keyframes panel-settle {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes view-swap {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes card-reveal {
+    0% {
+      box-shadow: 0 0 0 var(--foreground);
+      transform: translateY(0) scale(1);
+    }
+
+    45% {
+      box-shadow: 0 8px 0 var(--foreground);
+      transform: translateY(-4px) scale(1.006);
+    }
+
+    100% {
+      box-shadow: 0 3px 0 var(--foreground);
+      transform: translateY(-2px) scale(1);
+    }
+  }
+
+  @keyframes answer-reveal {
+    from {
+      opacity: 0;
+      transform: translateY(16px) scale(0.985);
+    }
+
+    60% {
+      opacity: 1;
+      transform: translateY(-2px) scale(1.01);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  @keyframes carousel-swap {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes modal-dim {
+    from {
+      opacity: 0;
+    }
+
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes modal-lift {
+    from {
+      opacity: 0;
+      transform: translateY(12px) scale(0.985);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  .app-shell {
+    animation: app-rise 220ms ease-out both;
+  }
+
+  .app-header {
+    animation: panel-settle 180ms ease-out both;
+  }
+
+  .app-panel {
+    animation: panel-settle 210ms ease-out 40ms both;
+  }
+
+  .app-footer {
+    animation: panel-settle 180ms ease-out 80ms both;
+  }
+
+  .view-swap {
+    animation: view-swap 160ms ease-out both;
+  }
+
+  .soft-reveal {
+    animation: view-swap 140ms ease-out both;
+  }
+
+  .practice-card-revealed {
+    animation: card-reveal 300ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+
+  .answer-reveal {
+    animation: answer-reveal 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+
+  .carousel-swap {
+    animation: carousel-swap 170ms ease-out both;
+  }
+
+  .carousel-controls {
+    transition:
+      background-color 140ms ease,
+      transform 140ms ease;
+  }
+
+  .carousel-controls:has(button:not(:disabled):active) {
+    transform: translateY(1px) scale(0.995);
+  }
+
+  .motion-card {
+    transition:
+      background-color 140ms ease,
+      box-shadow 140ms ease,
+      transform 140ms ease;
+  }
+
+  .motion-card:hover {
+    box-shadow: 3px 3px 0 var(--foreground);
+    transform: translate(-2px, -2px);
+  }
+
+  .motion-card:active {
+    box-shadow: none;
+    transform: translate(0, 0);
+  }
+
+  .modal-backdrop {
+    animation: modal-dim 150ms ease-out both;
+  }
+
+  .modal-card {
+    animation: modal-lift 180ms ease-out both;
+  }
+
+  button:not(:disabled),
+  a,
+  summary {
+    transition:
+      box-shadow 120ms ease,
+      transform 90ms ease;
+  }
+
+  input,
+  textarea {
+    transition:
+      background-color 120ms ease,
+      border-color 120ms ease,
+      box-shadow 120ms ease,
+      color 120ms ease,
+      transform 90ms ease;
+  }
+
+  button:not(:disabled):hover,
+  summary:hover,
+  a:hover {
+    box-shadow: 2px 2px 0 var(--foreground);
+    transform: translate(-1px, -1px);
+  }
+
+  button:not(:disabled):active,
+  summary:active,
+  a:active {
+    box-shadow: none;
+    transform: translate(0, 0) scale(0.99);
+  }
+
+  input:focus,
+  textarea:focus {
+    box-shadow: 3px 3px 0 var(--accent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
 }
